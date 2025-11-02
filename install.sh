@@ -5,29 +5,23 @@ echo " "
 echo "*****************************************************************************"
 echo "Updating Pi OS & packages"
 echo "*****************************************************************************"
-sudo apt update
-sudo apt upgrade -y
+sudo apt update && sudo apt upgrade -y
 echo " "
 echo "*****************************************************************************"
 echo "Installing additional Debian and Python packages"
 echo "*****************************************************************************"
-sudo apt install -m -y python3-pip
-sudo apt install -y python3-serial
-sudo apt install -y python3-psutil
-sudo apt install -y python3-pil
-sudo apt install -y python3-pil.imagetk
-sudo apt install -y git
-sudo apt install -y python3-smbus
-sudo apt install -y python3-picamera2
-sudo apt install -y python3-scipy
+sudo apt install -y \
+    python3-pip python3-serial python3-psutil python3-pil python3-pil.imagetk \
+    git python3-smbus python3-picamera2 python3-scipy samba samba-common-bin \
+    apache2 php8.2
 
 HOME=/home/efinder
 cd $HOME
 echo " "
 
 python -m venv /home/efinder/venv-efinder --system-site-packages
-venv-efinder/bin/python venv-efinder/bin/pip install adafruit-circuitpython-adxl34x
-venv-efinder/bin/python venv-efinder/bin/pip install gdown
+/home/efinder/venv-efinder/bin/pip install \
+    adafruit-circuitpython-adxl34x gdown
 
 cd $HOME
 echo " "
@@ -51,13 +45,14 @@ sudo chmod a+rwx /home/efinder/uploads
 cp /home/efinder/eFinder_cli/Solver/*.* /home/efinder/Solver
 echo "tmpfs /home/efinder/Solver/images tmpfs nodev,nosuid,size=10M 0 0" | sudo tee -a /etc/fstab > /dev/null
 
-cd $HOME
-echo " "
-echo "*****************************************************************************"
-echo "Installing Samba file share support"
-echo "*****************************************************************************"
-sudo apt install -y samba samba-common-bin
-sudo tee -a /etc/samba/smb.conf > /dev/null <<EOT
+if [ "$1" = "--enable-samba" ]; then
+    cd $HOME
+    echo " "
+    echo "*****************************************************************************"
+    echo "Installing Samba file share support"
+    echo "*****************************************************************************"
+    sudo apt install -y samba samba-common-bin
+    sudo tee -a /etc/samba/smb.conf > /dev/null <<EOT
 [efindershare]
 path = /home/efinder
 writeable=Yes
@@ -65,10 +60,11 @@ create mask=0777
 directory mask=0777
 public=no
 EOT
-username="efinder"
-pass="efinder"
-(echo $pass; sleep 1; echo $pass) | sudo smbpasswd -a -s $username
-sudo systemctl restart smbd
+    username="efinder"
+    pass="efinder"
+    (echo $pass; sleep 1; echo $pass) | sudo smbpasswd -a -s $username
+    sudo systemctl restart smbd
+fi
 
 cd $HOME
 echo " "
@@ -85,16 +81,12 @@ echo " "
 echo "*****************************************************************************"
 echo "Setting up web page server"
 echo "*****************************************************************************"
-sudo apt-get install -y apache2
-sudo apt-get install -y php8.2
-sudo chmod a+rwx /home/efinder
+#sudo chmod a+rwx /home/efinder # DO NOT CHANGE THE PERMISSIONS OF THE HOME FOLDER THIS BREAKS SSH Auth
 sudo chmod a+rwx /home/efinder/Solver/images
-sudo cp eFinder_cli/Solver/index.php /var/www/html
-sudo cp /home/efinder/eFinder_cli/Solver/upload.php /var/www/html
-sudo cp /home/efinder/eFinder_cli/Solver/updater.html /var/www/html
-sudo cp /home/efinder/eFinder_cli/Solver/user.ini /etc/php/8.2/apache2/conf.d
-sudo cp /home/efinder/eFinder_cli/Solver/user.ini /etc/php/8.2/cli/conf.d
-sudo mv /var/www/html/index.html /var/www/html/apacheindex.html
+sudo mv /var/www/html /var/www/html.orig
+sudo ln -sf /home/efinder/eFinder_cli/Solver/www/site/* /var/www/html/
+sudo ln -sf /home/efinder/eFinder_cli/Solver/www/phpini/user.ini /etc/php/8.2/apache2/conf.d/user.ini
+sudo ln -sf /home/efinder/eFinder_cli/Solver/www/phpini/user.ini /etc/php/8.2/cli/conf.d/user.ini
 sudo chmod -R 755 /var/www/html
 
 cd $HOME
